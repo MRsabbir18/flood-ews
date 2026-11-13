@@ -1,0 +1,523 @@
+<title>Flood Watch Station</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one column. Hero staff-gauge + reading, tile row, history chart beside alert log, collapsed settings. */
+:root{
+  --bg:#eef3f2; --surface:#ffffff; --surface2:#f3f7f6; --line:#d3dfdd;
+  --ink:#0f1f22; --ink2:#445a5d; --muted:#667c7f;
+  --accent:#0b7f8f; --accent-soft:rgba(11,127,143,.14);
+  --ok:#1b7f3b; --ok-bg:#e1f3e7;
+  --warn:#9a5b00; --warn-bg:#fff0d2;
+  --bad:#c02626; --bad-bg:#fde3e3;
+  --yel:#8a7000; --yel-bg:#fff5c2;
+  --font:'Instrument Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0a1315; --surface:#111d20; --surface2:#162428; --line:#243639;
+    --ink:#e8f1f0; --ink2:#a9bcbe; --muted:#7f9598;
+    --accent:#3cc4d6; --accent-soft:rgba(60,196,214,.16);
+    --ok:#4cd37b; --ok-bg:#12301f;
+    --warn:#ffb02e; --warn-bg:#3a2a08;
+    --bad:#ff6b6b; --bad-bg:#3d1414;
+    --yel:#f2d13b; --yel-bg:#353008;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0a1315; --surface:#111d20; --surface2:#162428; --line:#243639;
+  --ink:#e8f1f0; --ink2:#a9bcbe; --muted:#7f9598;
+  --accent:#3cc4d6; --accent-soft:rgba(60,196,214,.16);
+  --ok:#4cd37b; --ok-bg:#12301f;
+  --warn:#ffb02e; --warn-bg:#3a2a08;
+  --bad:#ff6b6b; --bad-bg:#3d1414;
+  --yel:#f2d13b; --yel-bg:#353008;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 var(--font);
+  padding-block:20px 48px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  font-variant-numeric:tabular-nums}
+.wrap{max-width:1080px;margin:0 auto;display:grid;gap:16px}
+.wrap>*{min-width:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* header */
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px}
+.brand svg{flex:none;color:var(--accent)}
+.brand h1{margin:0;font-size:18px;line-height:1.2;font-weight:700;letter-spacing:-.01em}
+.brand .sub{color:var(--muted);font-size:12px}
+.ctl{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.seg{display:inline-flex;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:2px}
+.seg button{border:0;background:none;padding:5px 11px;border-radius:6px;cursor:pointer;color:var(--ink2);font-size:13px}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--ink);font-weight:600}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);font-family:var(--mono)}
+.live i{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.live.on i{background:var(--ok);box-shadow:0 0 0 3px var(--ok-bg)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+/* state tokens */
+[data-state="normal"]{--st:var(--ok);--st-bg:var(--ok-bg)}
+[data-state="warning"]{--st:var(--warn);--st-bg:var(--warn-bg)}
+[data-state="danger"]{--st:var(--bad);--st-bg:var(--bad-bg)}
+[data-adv="none"]{--st:var(--ok);--st-bg:var(--ok-bg)}
+[data-adv="yellow"]{--st:var(--yel);--st-bg:var(--yel-bg)}
+[data-adv="orange"]{--st:var(--warn);--st-bg:var(--warn-bg)}
+[data-adv="red"]{--st:var(--bad);--st-bg:var(--bad-bg)}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 11px 4px 8px;border-radius:999px;background:var(--st-bg);color:var(--st);font-weight:700;font-size:13px;border:1px solid color-mix(in srgb,var(--st) 40%,transparent)}
+.pill svg{flex:none}
+
+/* hero */
+.hero{display:grid;grid-template-columns:168px 1fr;gap:24px;align-items:stretch;padding:20px}
+.gaugebox{background:var(--surface2);border-radius:10px;display:flex;justify-content:center;padding:8px 0}
+.gaugebox svg{display:block;max-width:100%;height:auto}
+.heroMain{display:flex;flex-direction:column;gap:10px;min-width:0}
+.bigrow{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.big{font-size:clamp(56px,11vw,92px);font-weight:700;line-height:1;letter-spacing:-.04em}
+.unit{font-size:22px;color:var(--muted);font-weight:500}
+.bigrow .pill{align-self:center;margin-left:8px}
+.msg{margin:0;color:var(--ink2);font-size:15px;max-width:52ch}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:14px;margin-top:auto;padding-top:14px;border-top:1px solid var(--line)}
+.facts .k{display:block;font-size:11px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.facts .v{font-family:var(--mono);font-size:13px}
+
+/* tiles */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}
+.tile{display:flex;flex-direction:column;gap:6px}
+.tile .val{display:flex;align-items:baseline;gap:6px}
+.tile .num{font-size:34px;font-weight:700;letter-spacing:-.02em;line-height:1.1}
+.tile .u{color:var(--muted)}
+.tile .row{display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:28px}
+.tile svg.spark{display:block;width:100%;height:28px}
+.rows{display:grid;gap:7px;margin-top:2px}
+.rows div{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dashed var(--line);padding-bottom:6px}
+.rows div:last-child{border-bottom:0;padding-bottom:0}
+.rows span:first-child{color:var(--muted)}
+.rows span:last-child{font-family:var(--mono);font-size:13px;text-align:right}
+
+/* history + log */
+.two{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:16px}
+.cardhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.cardhead h2{margin:0;font-size:15px}
+.chartwrap{position:relative;overflow:hidden}
+.chartwrap svg{display:block;max-width:100%}
+.chartwrap text{font-family:var(--mono);font-size:10.5px;fill:var(--muted)}
+#tip{position:absolute;top:6px;pointer-events:none;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.18);white-space:nowrap;z-index:2}
+#tip b{font-size:15px}
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);font-family:var(--mono)}
+th{color:var(--muted);font-weight:500;font-size:11px;letter-spacing:.05em;text-transform:uppercase}
+.empty{color:var(--muted);padding:24px 8px;text-align:center}
+ul.log{list-style:none;margin:0;padding:0;display:grid;gap:10px;max-height:300px;overflow:auto}
+ul.log li{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start}
+ul.log time{font-family:var(--mono);font-size:12px;color:var(--muted);padding-top:2px}
+ul.log .t{font-size:13px}
+.sev{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--st);margin-right:6px}
+
+/* scenario + settings */
+.scn{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.scn .note{color:var(--muted);font-size:12px}
+details.card summary{cursor:pointer;font-weight:600}
+.set{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-top:14px}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
+input{width:100%;font:inherit;font-family:var(--mono);font-size:13px;background:var(--surface2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:7px 9px}
+.fb{grid-column:1/-1}
+.notice{margin-top:10px;padding:10px 12px;border-radius:8px;background:var(--warn-bg);color:var(--ink);font-size:13px}
+.btn{background:var(--surface2);border:1px solid var(--line);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;color:var(--ink2)}
+.btn[aria-pressed="true"]{background:var(--accent-soft);color:var(--ink);border-color:var(--accent)}
+footer{color:var(--muted);font-size:12px}
+
+@media (max-width:760px){
+  .two{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:560px){
+  .hero{grid-template-columns:minmax(0,1fr)}
+  .gaugebox{padding:10px 0}
+}
+@media (prefers-reduced-motion:no-preference){
+  .big,.pill{transition:color .3s,background .3s}
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M3 11c3-3 5-3 8 0s5 3 8 0 5-3 8 0"/><path d="M3 18c3-3 5-3 8 0s5 3 8 0 5-3 8 0"/><path d="M3 25c3-3 5-3 8 0s5 3 8 0 5-3 8 0"/></svg>
+      <div><h1>Flood Watch</h1><div class="sub" id="sub">Station 1 · River gauge</div></div>
+    </div>
+    <div class="ctl">
+      <span class="live" id="live"><i></i><span id="liveTxt">DEMO</span></span>
+      <div class="seg" role="group" aria-label="Data source">
+        <button id="bDemo" aria-pressed="true">Demo</button>
+        <button id="bLive" aria-pressed="false">Live</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="notice" id="offline" hidden></div>
+
+  <section class="card hero" id="hero" data-state="normal" aria-live="polite">
+    <div class="gaugebox" id="gauge"></div>
+    <div class="heroMain">
+      <div class="eyebrow">Water level</div>
+      <div class="bigrow"><span class="big" id="lvl">0.00</span><span class="unit">m</span><span class="pill" id="pill"></span></div>
+      <p class="msg" id="msg"></p>
+      <div class="facts">
+        <div><span class="k">Trend</span><span class="v" id="trend">—</span></div>
+        <div><span class="k">Next threshold</span><span class="v" id="eta">—</span></div>
+        <div><span class="k">Warning at</span><span class="v" id="fWarn">—</span></div>
+        <div><span class="k">Danger at</span><span class="v" id="fDanger">—</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="tiles">
+    <div class="card tile" id="tRain" data-adv="none">
+      <div class="eyebrow">Rainfall</div>
+      <div class="val"><span class="num" id="rf">0.0</span><span class="u">mm/h</span></div>
+      <div class="row"><span class="pill" id="advPill"></span><span style="color:var(--muted);font-size:12px">Last 30 readings</span></div>
+      <div id="spark"></div>
+    </div>
+    <div class="card tile">
+      <div class="eyebrow">Air</div>
+      <div class="val"><span class="num" id="tp">0.0</span><span class="u">°C</span></div>
+      <div class="rows"><div><span>Humidity</span><span id="hm">—</span></div><div><span>Sensor</span><span id="airSrc">DHT22 (optional)</span></div></div>
+    </div>
+    <div class="card tile">
+      <div class="eyebrow">Device</div>
+      <div class="rows">
+        <div><span>Signal</span><span id="rssi">—</span></div>
+        <div><span>Battery</span><span id="bat">—</span></div>
+        <div><span>Buzzer</span><span id="buz">Silent</span></div>
+        <div><span>Last update</span><span id="upd">—</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="two">
+    <div class="card">
+      <div class="cardhead">
+        <h2>Water level history</h2>
+        <div class="ctl">
+          <div class="seg" role="group" aria-label="Time range">
+            <button data-range="30" aria-pressed="false">30 min</button>
+            <button data-range="60" aria-pressed="false">1 h</button>
+            <button data-range="120" aria-pressed="true">2 h</button>
+          </div>
+          <button class="btn" id="bTable" aria-pressed="false">Table</button>
+        </div>
+      </div>
+      <div class="chartwrap" id="chartwrap"><div id="chart"></div><div id="tip" hidden></div></div>
+      <div class="tbl" id="tbl" hidden></div>
+    </div>
+    <div class="card">
+      <div class="cardhead"><h2>Alert log</h2></div>
+      <ul class="log" id="log"></ul>
+    </div>
+  </section>
+
+  <section class="card scn" id="scn">
+    <span class="eyebrow">Demo scenario</span>
+    <div class="seg" role="group" aria-label="Scenario">
+      <button data-scn="calm" aria-pressed="true">Calm</button>
+      <button data-scn="rain" aria-pressed="false">Heavy rain</button>
+      <button data-scn="flood" aria-pressed="false">Flood</button>
+    </div>
+    <span class="note">Demo runs fast: each update is one simulated minute.</span>
+  </section>
+
+  <details class="card">
+    <summary>Settings</summary>
+    <div class="set">
+      <div><label for="sStation">Station name</label><input id="sStation" value="Station 1"></div>
+      <div><label for="sWarn">Warning level (m)</label><input id="sWarn" type="number" step="0.1" value="3.0"></div>
+      <div><label for="sCrit">Danger level (m)</label><input id="sCrit" type="number" step="0.1" value="4.0"></div>
+      <div><label for="sMax">Gauge height (m)</label><input id="sMax" type="number" step="0.5" value="5"></div>
+      <div><label for="sY">Yellow rain from (mm/h)</label><input id="sY" type="number" step="0.5" value="7.5"></div>
+      <div><label for="sO">Orange rain from (mm/h)</label><input id="sO" type="number" step="0.5" value="15"></div>
+      <div><label for="sR">Red rain from (mm/h)</label><input id="sR" type="number" step="0.5" value="30"></div>
+      <div class="fb"><label for="sFb">Firebase Realtime Database URL (for Live mode)</label><input id="sFb" placeholder="https://your-project-default-rtdb.firebaseio.com"></div>
+    </div>
+    <div class="notice" id="notice" hidden></div>
+  </details>
+
+  <footer>Thresholds match the ESP32 firmware. Change them in both places.</footer>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const store={get(k,d){try{const v=localStorage.getItem(k);return v===null?d:v}catch(e){return d}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+const cfg={warn:3.0,crit:4.0,max:5,y:7.5,o:15,r:30,station:'Station 1',fb:'https://flood-ews-efb91-default-rtdb.asia-southeast1.firebasedatabase.app'};
+try{Object.assign(cfg,JSON.parse(store.get('fws-cfg','{}')))}catch(e){}
+
+const STATE_TXT={normal:'Normal',warning:'Warning',danger:'Danger'};
+const STATE_MSG={
+  normal:'Water is below the warning mark. No action needed.',
+  warning:'Water is above the warning mark. Watch the level and get ready to move.',
+  danger:'Water is above the danger mark. Move people and valuables to higher ground.'
+};
+const ADV_TXT={none:'No advisory',yellow:'Yellow advisory',orange:'Orange advisory',red:'Red advisory'};
+const BUZ={normal:'Silent',warning:'Single beep',danger:'Double beep, repeating'};
+const ICON={
+  normal:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/></svg>',
+  warning:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.01"/></svg>',
+  danger:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2h8l6 6v8l-6 6H8l-6-6V8z"/><path d="M12 7v6M12 16.5v.01"/></svg>'
+};
+const stateOf=l=>l>=cfg.crit?'danger':l>=cfg.warn?'warning':'normal';
+const advOf=r=>r>=cfg.r?'red':r>=cfg.o?'orange':r>=cfg.y?'yellow':'none';
+const fmtT=ts=>new Date(ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+
+let history=[], events=[], mode='demo', range=120, last=null, prev={state:null,adv:null}, timer=null, ctx=null;
+
+/* ---------- demo simulator ---------- */
+const sim={scn:'calm',wl:1.8,rf:0,t:27.5,h:68,clock:Date.now()};
+const TARGET={calm:[1.8,0],rain:[3.3,22],flood:[4.5,38]};
+function simStep(){
+  sim.clock+=60000;
+  const tg=TARGET[sim.scn];
+  sim.wl+=(tg[0]-sim.wl)*0.06+(Math.random()-.5)*0.03;
+  sim.rf+=(tg[1]-sim.rf)*0.2+(Math.random()-.5)*1.4; sim.rf=Math.max(0,sim.rf);
+  sim.t+=(Math.random()-.5)*0.15;
+  sim.h=Math.min(98,Math.max(45,sim.h+(Math.random()-.5)*1.2+(sim.rf>5?.4:-.1)));
+  return {level:Math.max(0,sim.wl),rain:sim.rf,temp:sim.t,hum:sim.h,bat:12.4-Math.random()*0.08,rssi:-58-Math.round(Math.random()*8),ts:sim.clock};
+}
+
+/* ---------- live (Firebase REST) ---------- */
+function fbUrl(){return (cfg.fb||'').replace(/\/$/,'')}
+function toReading(d){return {level:+d.level||0,rain:+d.rain||0,temp:+d.temp||0,hum:+d.hum||0,bat:+d.bat||0,rssi:+d.rssi||0,ts:(d.ts&&d.ts>1e9)?d.ts*1000:Date.now()}}
+async function liveLatest(){
+  const r=await fetch(fbUrl()+'/readings/latest.json'); const d=await r.json();
+  if(!d) throw new Error('The database has no readings yet.');
+  return toReading(d);
+}
+async function liveHistory(){
+  const q=encodeURIComponent('"$key"');
+  const r=await fetch(fbUrl()+'/readings/history.json?orderBy='+q+'&limitToLast=180');
+  const d=await r.json(); if(!d||d.error) return [];
+  return Object.values(d).map(toReading).sort((a,b)=>a.ts-b.ts);
+}
+function notice(msg){const n=$('notice');n.hidden=!msg;n.textContent=msg||'';if(msg)document.querySelector('details').open=true}
+
+/* ---------- derived values ---------- */
+function rate(){
+  const n=history.length; if(n<2) return 0;
+  const l=history[n-1]; let ref=history[0];
+  for(let i=n-1;i>=0;i--){ if(l.ts-history[i].ts>=15*60000){ref=history[i];break} }
+  const dt=(l.ts-ref.ts)/3600000; return dt>0?(l.level-ref.level)/dt:0;
+}
+
+/* ---------- drawing ---------- */
+function drawGauge(level,state){
+  const H=300,W=150,top=12,bot=12,ymax=cfg.max;
+  const Y=v=>H-bot-(Math.min(v,ymax)/ymax)*(H-top-bot);
+  const cx=50,cw=38;
+  let s=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Staff gauge: ${level.toFixed(2)} metres, ${STATE_TXT[state]}">`;
+  s+=`<rect x="${cx}" y="${top}" width="${cw}" height="${H-top-bot}" rx="3" fill="var(--surface)" stroke="var(--line)"/>`;
+  s+=`<rect x="${cx}" y="${Y(cfg.crit)}" width="${cw}" height="${Y(cfg.warn)-Y(cfg.crit)}" fill="var(--warn-bg)"/>`;
+  s+=`<rect x="${cx}" y="${top}" width="${cw}" height="${Y(cfg.crit)-top}" fill="var(--bad-bg)"/>`;
+  s+=`<rect x="${cx}" y="${Y(level)}" width="${cw}" height="${Y(0)-Y(level)}" fill="var(--st)" opacity=".85"/>`;
+  s+=`<line x1="${cx}" x2="${cx+cw}" y1="${Y(level)}" y2="${Y(level)}" stroke="var(--st)" stroke-width="2"/>`;
+  for(let v=0;v<=ymax+1e-6;v+=0.5){
+    const major=Math.abs(v-Math.round(v))<1e-6, y=Y(v);
+    s+=`<line x1="${cx-(major?9:5)}" x2="${cx}" y1="${y}" y2="${y}" stroke="var(--muted)" stroke-width="1"/>`;
+    if(major) s+=`<text x="${cx-12}" y="${y+3.5}" text-anchor="end" font-family="IBM Plex Mono,monospace" font-size="10" fill="var(--muted)">${Math.round(v)}</text>`;
+  }
+  [[cfg.warn,'var(--warn)','WARN'],[cfg.crit,'var(--bad)','DANGER']].forEach(([v,c,t])=>{
+    s+=`<line x1="${cx+cw}" x2="${cx+cw+12}" y1="${Y(v)}" y2="${Y(v)}" stroke="${c}" stroke-width="2"/>`;
+    s+=`<text x="${cx+cw+16}" y="${Y(v)+3.5}" font-family="IBM Plex Mono,monospace" font-size="9" fill="var(--muted)">${t}</text>`;
+  });
+  $('gauge').innerHTML=s+'</svg>';
+}
+function drawSpark(){
+  const vals=history.slice(-30).map(d=>d.rain); const el=$('spark');
+  if(!vals.length){el.innerHTML='';return}
+  const W=240,H=28,bw=W/30, mx=Math.max(cfg.r,...vals), off=30-vals.length;
+  let s=`<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Recent rainfall bars">`;
+  vals.forEach((v,i)=>{const h=Math.max(1.5,v/mx*H);s+=`<rect x="${(i+off)*bw+.5}" y="${H-h}" width="${bw-1.5}" height="${h}" rx="1" fill="var(--accent)"/>`});
+  el.innerHTML=s+'</svg>';
+}
+function drawChart(){
+  const box=$('chart'), W=Math.max(260,Math.floor($('chartwrap').clientWidth)), H=260, m={l:34,r:12,t:12,b:24};
+  if(!last){box.innerHTML='';return}
+  const data=history.filter(d=>d.ts>=last.ts-range*60000);
+  if(data.length<2){box.innerHTML='<div class="empty">Collecting readings…</div>';ctx=null;return}
+  const x0=data[0].ts,x1=data[data.length-1].ts;
+  const ymax=Math.max(cfg.max,Math.ceil(Math.max(...data.map(d=>d.level))+0.3));
+  const X=t=>m.l+(t-x0)/(x1-x0)*(W-m.l-m.r), Y=v=>H-m.b-(v/ymax)*(H-m.t-m.b);
+  let s=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Water level over the last ${range} minutes">`;
+  s+=`<rect x="${m.l}" y="${m.t}" width="${W-m.l-m.r}" height="${Math.max(0,Y(cfg.crit)-m.t)}" fill="var(--bad-bg)" opacity=".7"/>`;
+  s+=`<rect x="${m.l}" y="${Y(cfg.crit)}" width="${W-m.l-m.r}" height="${Math.max(0,Y(cfg.warn)-Y(cfg.crit))}" fill="var(--warn-bg)" opacity=".8"/>`;
+  for(let v=0;v<=ymax;v++){
+    s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width="1"/>`;
+    s+=`<text x="${m.l-6}" y="${Y(v)+3.5}" text-anchor="end">${v}</text>`;
+  }
+  for(let i=0;i<=3;i++){const t=x0+(x1-x0)*i/3;s+=`<text x="${X(t)}" y="${H-6}" text-anchor="${i===0?'start':i===3?'end':'middle'}">${fmtT(t)}</text>`}
+  [[cfg.warn,'var(--warn)','Warning '+cfg.warn.toFixed(1)+' m'],[cfg.crit,'var(--bad)','Danger '+cfg.crit.toFixed(1)+' m']].forEach(([v,c,t])=>{
+    if(v<=ymax){s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="${c}" stroke-width="1.2" stroke-dasharray="5 4"/>`;
+    s+=`<text x="${W-m.r-4}" y="${Y(v)-5}" text-anchor="end">${t}</text>`}
+  });
+  const pts=data.map(d=>X(d.ts).toFixed(1)+','+Y(d.level).toFixed(1));
+  s+=`<path d="M${pts.join('L')}L${X(x1)},${Y(0)}L${X(x0)},${Y(0)}Z" fill="var(--accent-soft)"/>`;
+  s+=`<path d="M${pts.join('L')}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+  const e=data[data.length-1];
+  s+=`<circle cx="${X(e.ts)}" cy="${Y(e.level)}" r="4" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/>`;
+  s+=`<line id="xh" y1="${m.t}" y2="${H-m.b}" stroke="var(--muted)" stroke-width="1" visibility="hidden"/>`;
+  s+=`<circle id="xd" r="4.5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2" visibility="hidden"/>`;
+  s+=`<rect id="hit" x="${m.l}" y="${m.t}" width="${W-m.l-m.r}" height="${H-m.t-m.b}" fill="transparent" style="touch-action:pan-y"/>`;
+  box.innerHTML=s+'</svg>';
+  ctx={data,X,Y,x0,x1,m,W};
+  const hit=$('hit');
+  hit.addEventListener('pointermove',onMove);
+  hit.addEventListener('pointerleave',hideTip);
+}
+function hideTip(){
+  $('tip').hidden=true;
+  const a=$('xh'),b=$('xd'); if(a)a.setAttribute('visibility','hidden'); if(b)b.setAttribute('visibility','hidden');
+}
+function onMove(e){
+  if(!ctx) return;
+  const r=e.currentTarget.getBoundingClientRect();
+  const t=ctx.x0+((e.clientX-r.left)/r.width)*(ctx.x1-ctx.x0);
+  let best=ctx.data[0];
+  for(const d of ctx.data){ if(Math.abs(d.ts-t)<Math.abs(best.ts-t)) best=d }
+  const px=ctx.X(best.ts), py=ctx.Y(best.level);
+  const xh=$('xh'), xd=$('xd');
+  xh.setAttribute('x1',px); xh.setAttribute('x2',px); xh.setAttribute('visibility','visible');
+  xd.setAttribute('cx',px); xd.setAttribute('cy',py); xd.setAttribute('visibility','visible');
+  const st=stateOf(best.level), tip=$('tip');
+  tip.dataset.state=st;
+  tip.innerHTML=`<div style="color:var(--muted);font-family:var(--mono);font-size:11px">${fmtT(best.ts)}</div><b>${best.level.toFixed(2)} m</b> <span style="color:var(--st);font-weight:600">${STATE_TXT[st]}</span><div style="color:var(--ink2)">Rain ${best.rain.toFixed(1)} mm/h</div>`;
+  tip.hidden=false;
+  const flip=px>ctx.W*0.6;
+  tip.style.left=(flip?px-12:px+12)+'px';
+  tip.style.transform=flip?'translateX(-100%)':'none';
+}
+function drawTable(){
+  const rows=history.slice(-12).reverse();
+  $('tbl').innerHTML='<table><thead><tr><th>Time</th><th>Level (m)</th><th>State</th><th>Rain (mm/h)</th></tr></thead><tbody>'+
+    rows.map(d=>`<tr><td>${fmtT(d.ts)}</td><td>${d.level.toFixed(2)}</td><td>${STATE_TXT[stateOf(d.level)]}</td><td>${d.rain.toFixed(1)}</td></tr>`).join('')+'</tbody></table>';
+}
+function drawLog(){
+  const ul=$('log');
+  if(!events.length){ul.innerHTML='<li class="empty" style="display:block">No alerts yet. Try Heavy rain in the demo scenario below.</li>';return}
+  ul.innerHTML=events.map(e=>`<li data-state="${e.st||''}" data-adv="${e.adv||''}"><time>${fmtT(e.ts)}</time><span class="t"><i class="sev"></i>${e.text}</span></li>`).join('');
+}
+
+/* ---------- render ---------- */
+function render(){
+  if(!last) return;
+  const d=last, st=stateOf(d.level), adv=advOf(d.rain), rt=rate();
+  const hero=$('hero'); hero.dataset.state=st;
+  $('lvl').textContent=d.level.toFixed(2);
+  $('pill').innerHTML=ICON[st]+STATE_TXT[st];
+  $('msg').textContent=STATE_MSG[st];
+  $('fWarn').textContent=cfg.warn.toFixed(1)+' m';
+  $('fDanger').textContent=cfg.crit.toFixed(1)+' m';
+  $('trend').textContent=rt>0.1?`Rising ${rt.toFixed(2)} m/h`:rt<-0.1?`Falling ${Math.abs(rt).toFixed(2)} m/h`:'Steady';
+  let eta='Not rising';
+  if(rt>0.05 && st!=='danger'){
+    const tgt=st==='normal'?cfg.warn:cfg.crit, mins=Math.round((tgt-d.level)/rt*60);
+    eta=`~${mins} min to ${st==='normal'?'Warning':'Danger'}`;
+  } else if(st==='danger') eta='Danger reached';
+  $('eta').textContent=eta;
+  drawGauge(d.level,st);
+
+  $('tRain').dataset.adv=adv;
+  $('rf').textContent=d.rain.toFixed(1);
+  $('advPill').textContent=ADV_TXT[adv];
+  drawSpark();
+  $('tp').textContent=d.temp>0?d.temp.toFixed(1):'—';
+  $('hm').textContent=d.hum>0?Math.round(d.hum)+' %':'—';
+  $('rssi').textContent=d.rssi?d.rssi+' dBm':'—';
+  $('bat').textContent=d.bat>0?d.bat.toFixed(1)+' V':'Mains';
+  $('buz').textContent=BUZ[st];
+  $('upd').textContent=fmtT(d.ts);
+  $('sub').textContent=cfg.station+' · River gauge';
+  drawChart(); drawTable(); drawLog();
+}
+function pushReading(d){
+  history.push(d); if(history.length>400) history.shift(); last=d;
+  const st=stateOf(d.level), adv=advOf(d.rain);
+  if(prev.state!==null && st!==prev.state){
+    const up=['normal','warning','danger'].indexOf(st)>['normal','warning','danger'].indexOf(prev.state);
+    events.unshift({ts:d.ts,st,text:`${up?'Level rose to':'Level back to'} ${STATE_TXT[st]} at ${d.level.toFixed(2)} m`});
+  }
+  if(prev.adv!==null && adv!==prev.adv){
+    events.unshift({ts:d.ts,adv,text:adv==='none'?'Rainfall advisory cleared':`${ADV_TXT[adv]} at ${d.rain.toFixed(1)} mm/h`});
+  }
+  events=events.slice(0,30); prev={state:st,adv};
+}
+
+/* ---------- loop & modes ---------- */
+async function tick(){
+  try{
+    if(mode==='demo') pushReading(simStep());
+    else {
+      const r=await liveLatest();
+      if(!last||r.ts!==last.ts) pushReading(r);
+      notice('');
+      const age=Date.now()-last.ts, off=$('offline');
+      if(age>120000){ setLive(false,'OFFLINE'); off.hidden=false; off.textContent='No new reading for '+Math.round(age/60000)+' min. Check that the ESP32 has power and WiFi.'; }
+      else { setLive(true,'LIVE'); off.hidden=true; }
+    }
+    render();
+  }catch(e){
+    setLive(false,'NO DATA');
+    notice(mode==='live'?`Could not read Live data: ${e.message||e} Check the Firebase URL in Settings and that the ESP32 has sent at least one reading.`:String(e));
+  }
+}
+function setLive(on,txt){$('live').classList.toggle('on',on);$('liveTxt').textContent=txt}
+function start(){
+  clearInterval(timer); history=[]; events=[]; last=null; prev={state:null,adv:null};
+  $('scn').hidden=mode!=='demo'; $('offline').hidden=true;
+  $('bDemo').setAttribute('aria-pressed',mode==='demo'); $('bLive').setAttribute('aria-pressed',mode==='live');
+  if(mode==='demo'){
+    sim.clock=Date.now()-180*60000; sim.scn='calm'; sim.wl=1.8; sim.rf=0;
+    document.querySelectorAll('[data-scn]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.scn==='calm'));
+    for(let i=0;i<180;i++) pushReading(simStep());
+    events=[]; setLive(true,'DEMO'); notice(''); render();
+    timer=setInterval(tick,1600);
+  } else {
+    setLive(false,'CONNECTING');
+    if(!fbUrl()){notice('Add your Firebase Realtime Database URL in Settings, then press Live again.');return}
+    liveHistory().then(h=>{h.forEach(pushReading);events=[];if(last)render()}).catch(()=>{}).finally(()=>{tick();timer=setInterval(tick,10000)});
+  }
+}
+
+/* ---------- wiring ---------- */
+$('bDemo').onclick=()=>{mode='demo';start()};
+$('bLive').onclick=()=>{mode='live';start()};
+document.querySelectorAll('[data-scn]').forEach(b=>b.onclick=()=>{
+  sim.scn=b.dataset.scn;
+  document.querySelectorAll('[data-scn]').forEach(x=>x.setAttribute('aria-pressed',x===b));
+});
+document.querySelectorAll('[data-range]').forEach(b=>b.onclick=()=>{
+  range=+b.dataset.range;
+  document.querySelectorAll('[data-range]').forEach(x=>x.setAttribute('aria-pressed',x===b));
+  drawChart();
+});
+$('bTable').onclick=()=>{
+  const on=$('bTable').getAttribute('aria-pressed')!=='true';
+  $('bTable').setAttribute('aria-pressed',on);
+  $('tbl').hidden=!on; $('chartwrap').hidden=on;
+};
+const FIELDS={sStation:'station',sWarn:'warn',sCrit:'crit',sMax:'max',sY:'y',sO:'o',sR:'r',sFb:'fb'};
+Object.entries(FIELDS).forEach(([id,k])=>{
+  const el=$(id); el.value=cfg[k];
+  el.addEventListener('change',()=>{
+    cfg[k]=(k==='station'||k==='fb')?el.value.trim():(parseFloat(el.value)||cfg[k]);
+    store.set('fws-cfg',JSON.stringify(cfg)); render();
+  });
+});
+let rz; addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(drawChart,120)});
+start();
+</script>
